@@ -23,6 +23,7 @@ type SiteHits struct{
 func main() {
 	http.HandleFunc("/", handle)
 	http.HandleFunc("/email", emailHandle)
+	http.HandleFunc("/login", LoginHandle)
 	appengine.Main()
 }
 
@@ -51,9 +52,14 @@ type Error struct{
 type ActionResponse struct{
 	Type string `json:"type"`
 	Action string `json:"action"`
+	EMail string `json:"email"`
+	ID string `json:"id"`
+	Admin bool `json:"admin"`
 }
 
 func emailHandle(w http.ResponseWriter, r *http.Request){
+
+	w.Header().Set("Content-type", "application/json; charset=utf-8")
 	encoder := json.NewEncoder(w)
 
 	if r.Method != "POST" {
@@ -65,10 +71,33 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
+	ctx := appengine.NewContext(r)
+
+	u,err := TokenAuth(ctx, r)
+
+	if u == nil {
+		encoder.Encode(Error{
+			Type: "error",
+			Message: "login missing"})
+
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err != nil {
+		encoder.Encode(Error{
+			Type: "error",
+			Message: fmt.Sprintf("%v", err)})
+
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+
 	decoder := json.NewDecoder(r.Body)
 	email := Email{}
 
-	err := decoder.Decode(&email)
+	err = decoder.Decode(&email)
 
 	if err != nil {
 		encoder.Encode(Error{
@@ -81,7 +110,11 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 
 	encoder.Encode(ActionResponse{
 		Type: "action",
-		Action: "do_nothing"})
+		Action: "do_nothing",
+		EMail: u.Email(),
+		ID: u.Id(),
+		Admin: u.IsAdmin(),
+	})
 }
 
 func handle(w http.ResponseWriter, r *http.Request) {
