@@ -46,25 +46,6 @@ type Email struct{
 	UserId string
 }
 
-func (address *EmailAddress)Save()([]datastore.Property, error){
-	return []datastore.Property{
-		{Name:"address", Value:address.Address},
-		{Name:"name", Value:address.Name},
-	}, nil
-}
-
-func (address *EmailAddress) Load(props []datastore.Property) error{
-	for _, p := range props{
-		if p.Name == "address" {
-			address.Address = p.Value.(string)
-		} else if p.Name == "name" {
-			address.Name = p.Value.(string)
-		}
-	}
-
-	return nil
-}
-
 func addressToJson(emails []EmailAddress, name string)([]datastore.Property,error){
 	items := make([]datastore.Property, len(emails))
 
@@ -81,6 +62,18 @@ func addressToJson(emails []EmailAddress, name string)([]datastore.Property,erro
 	}
 
 	return items, nil
+}
+
+func jsonToAddress(address string)(EmailAddress, error){
+	result := EmailAddress{}
+
+	err := json.Unmarshal([]byte(address), &result)
+
+	if err != nil {
+		return result, err
+	}
+
+	return result, nil
 }
 
 func (e *Email)Save()([]datastore.Property, error){
@@ -128,13 +121,20 @@ func (e *Email)Save()([]datastore.Property, error){
 }
 
 func (e *Email) Load(props []datastore.Property) error{
+	var err error = nil
+	var address EmailAddress
+
+	e.ToAddress = make([]EmailAddress, 0)
+	e.CcAddress = make([]EmailAddress, 0)
+	e.BccAddress = make([]EmailAddress, 0)
+
 	for _, p := range props{
 		if p.Name == "subject" {
 			e.Subject = p.Value.(string)
 		} else if p.Name == "body" {
 			e.Body = p.Value.(string)
 		} else if p.Name == "to_address" {
-			e.From.Load(p.Value.([]datastore.Property))
+			e.From,err = jsonToAddress(p.Value.(string))
 		} else if p.Name == "send_time" {
 			e.SendTime = p.Value.(time.Time)
 		} else if p.Name == "receive_time" {
@@ -143,6 +143,22 @@ func (e *Email) Load(props []datastore.Property) error{
 			e.CreateTime = p.Value.(time.Time)
 		} else if p.Name == "user_id" {
 			e.UserId = p.Value.(string)
+		} else if p.Name == "to_address" {
+			address, err = jsonToAddress(p.Value.(string))
+			e.ToAddress = append(e.ToAddress, address)
+		} else if p.Name == "cc_address" {
+			address, err = jsonToAddress(p.Value.(string))
+			e.CcAddress = append(e.CcAddress, address)
+		} else if p.Name == "bcc_address" {
+			address, err = jsonToAddress(p.Value.(string))
+			e.BccAddress = append(e.BccAddress, address)
+		}
+
+		if err != nil {
+			return fmt.Errorf(
+				"failed to process field:%s, error:%v",
+				p.Name,
+				err)
 		}
 
 		fmt.Printf("Property:%s Value:%#v\n", p.Name, p.Value)
