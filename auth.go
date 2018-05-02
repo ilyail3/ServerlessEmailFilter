@@ -41,10 +41,6 @@ type secretStruct struct {
 	Data string
 }
 
-type loginUrlStruct struct {
-	Url string
-}
-
 func secret(ctx context.Context)([]byte, error) {
 	key := datastore.NewKey(ctx, "secret", "secret", 0, nil)
 	data := secretStruct{}
@@ -72,7 +68,7 @@ func TokenAuth(ctx context.Context, r *http.Request)(AuthUser, error){
 	token, err := jwt.Parse(r.Header.Get("X-JWT"), func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 
 		secret, err := secret(ctx)

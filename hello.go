@@ -33,6 +33,7 @@ type EmailAddress struct {
 }
 
 type Email struct{
+	Id string `json:"id"`
 	Subject string `json:"subject"`
 	Body string `json:"body"`
 	From EmailAddress `json:"from"`
@@ -42,6 +43,112 @@ type Email struct{
 	SendTime time.Time `json:"sendTime"`
 	ReceiveTime time.Time `json:"receiveTime"`
 	CreateTime time.Time `json:"createTime"`
+	UserId string
+}
+
+func (address *EmailAddress)Save()([]datastore.Property, error){
+	return []datastore.Property{
+		{Name:"address", Value:address.Address},
+		{Name:"name", Value:address.Name},
+	}, nil
+}
+
+func (address *EmailAddress) Load(props []datastore.Property) error{
+	for _, p := range props{
+		if p.Name == "address" {
+			address.Address = p.Value.(string)
+		} else if p.Name == "name" {
+			address.Name = p.Value.(string)
+		}
+	}
+
+	return nil
+}
+
+func addressToJson(emails []EmailAddress, name string)([]datastore.Property,error){
+	items := make([]datastore.Property, len(emails))
+
+	for i, add := range emails {
+		bytes, err := json.Marshal(add)
+
+		if err != nil {
+			return items, err
+		}
+
+		items[i].Name = name
+		items[i].Value = string(bytes)
+		items[i].Multiple = true
+	}
+
+	return items, nil
+}
+
+func (e *Email)Save()([]datastore.Property, error){
+	bytes, err := json.Marshal(e.From)
+
+	if err != nil {
+		return []datastore.Property{}, err
+	}
+
+	result := []datastore.Property{
+		{Name:"subject", Value:e.Subject},
+		{Name:"body", Value:e.Body},
+		{Name:"from", Value:string(bytes)},
+		{Name:"send_time", Value:e.SendTime},
+		{Name:"receive_time", Value:e.ReceiveTime},
+		{Name:"create_time", Value:e.CreateTime},
+		{Name:"user_id", Value:e.UserId},
+	}
+
+	toAddress, err := addressToJson(e.ToAddress, "to_address")
+
+	if err != nil {
+		return []datastore.Property{}, err
+	}
+
+	result = append(result, toAddress...)
+
+	ccAddress, err := addressToJson(e.CcAddress, "cc_address")
+
+	if err != nil {
+		return []datastore.Property{}, err
+	}
+
+	result = append(result, ccAddress...)
+
+	bccAddress, err := addressToJson(e.BccAddress, "bcc_address")
+
+	if err != nil {
+		return []datastore.Property{}, err
+	}
+
+	result = append(result, bccAddress...)
+
+	return result, nil
+}
+
+func (e *Email) Load(props []datastore.Property) error{
+	for _, p := range props{
+		if p.Name == "subject" {
+			e.Subject = p.Value.(string)
+		} else if p.Name == "body" {
+			e.Body = p.Value.(string)
+		} else if p.Name == "to_address" {
+			e.From.Load(p.Value.([]datastore.Property))
+		} else if p.Name == "send_time" {
+			e.SendTime = p.Value.(time.Time)
+		} else if p.Name == "receive_time" {
+			e.ReceiveTime = p.Value.(time.Time)
+		} else if p.Name == "create_time" {
+			e.CreateTime = p.Value.(time.Time)
+		} else if p.Name == "user_id" {
+			e.UserId = p.Value.(string)
+		}
+
+		fmt.Printf("Property:%s Value:%#v\n", p.Name, p.Value)
+	}
+
+	return nil
 }
 
 type Error struct{
@@ -98,6 +205,19 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 	email := Email{}
 
 	err = decoder.Decode(&email)
+
+	if err != nil {
+		encoder.Encode(Error{
+			Type: "error",
+			Message: fmt.Sprintf("%v", err)})
+
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	email.UserId = u.Id()
+
+	_, err = datastore.Put(ctx, datastore.NewKey(ctx, "email", email.Id,0, nil), &email)
 
 	if err != nil {
 		encoder.Encode(Error{
