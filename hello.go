@@ -40,17 +40,24 @@ type ActionResponse struct{
 	Admin bool `json:"admin"`
 }
 
-func emailHandle(w http.ResponseWriter, r *http.Request){
+func errorResponse500(w http.ResponseWriter, e error){
+	errorResponse(w, fmt.Sprintf("%v", e), http.StatusInternalServerError)
+}
 
+func errorResponse(w http.ResponseWriter, message string, code int){
 	w.Header().Set("Content-type", "application/json; charset=utf-8")
+	w.WriteHeader(code)
+
 	encoder := json.NewEncoder(w)
 
-	if r.Method != "POST" {
-		encoder.Encode(Error{
-			Type: "error",
-			Message: "Only 'POST' requests are allowed"})
+	encoder.Encode(Error{
+		Type: "error",
+		Message: message})
+}
 
-		w.WriteHeader(http.StatusMethodNotAllowed)
+func emailHandle(w http.ResponseWriter, r *http.Request){
+	if r.Method != "POST" {
+		errorResponse(w, "Only 'POST' requests are allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -59,20 +66,12 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 	u,err := TokenAuth(ctx, r)
 
 	if u == nil {
-		encoder.Encode(Error{
-			Type: "error",
-			Message: "login missing"})
-
-		w.WriteHeader(http.StatusInternalServerError)
+		errorResponse(w, "login missing", http.StatusUnauthorized)
 		return
 	}
 
 	if err != nil {
-		encoder.Encode(Error{
-			Type: "error",
-			Message: fmt.Sprintf("%v", err)})
-
-		w.WriteHeader(http.StatusInternalServerError)
+		errorResponse500(w, err)
 		return
 	}
 
@@ -83,11 +82,7 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 	err = decoder.Decode(&email)
 
 	if err != nil {
-		encoder.Encode(Error{
-			Type: "error",
-			Message: fmt.Sprintf("%v", err)})
-
-		w.WriteHeader(http.StatusInternalServerError)
+		errorResponse500(w, err)
 		return
 	}
 
@@ -96,13 +91,12 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 	_, err = datastore.Put(ctx, datastore.NewKey(ctx, "email", email.Id,0, nil), &email)
 
 	if err != nil {
-		encoder.Encode(Error{
-			Type: "error",
-			Message: fmt.Sprintf("%v", err)})
-
-		w.WriteHeader(http.StatusInternalServerError)
+		errorResponse500(w, err)
 		return
 	}
+
+	w.Header().Set("Content-type", "application/json; charset=utf-8")
+	encoder := json.NewEncoder(w)
 
 	encoder.Encode(ActionResponse{
 		Type: "action",

@@ -65,7 +65,8 @@ func (e *Email)Save()([]datastore.Property, error){
 
 	result := []datastore.Property{
 		{Name:"subject", Value:e.Subject},
-		{Name:"body", Value:e.Body},
+		// body can easily exceed the maximum allowed for entry store(currently 1500 chars)
+		// {Name:"body", Value:e.Body},
 		{Name:"from", Value:string(bytes)},
 		{Name:"send_time", Value:e.SendTime},
 		{Name:"receive_time", Value:e.ReceiveTime},
