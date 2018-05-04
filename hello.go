@@ -13,6 +13,9 @@ import (
 	"time"
 	"google.golang.org/appengine/datastore"
 	"encoding/json"
+	"google.golang.org/appengine/user"
+	"context"
+	"io"
 )
 
 type SiteHits struct{
@@ -24,6 +27,7 @@ func main() {
 	http.HandleFunc("/", handle)
 	http.HandleFunc("/email", emailHandle)
 	http.HandleFunc("/login", LoginHandle)
+	http.HandleFunc("/enc", encTest)
 	appengine.Main()
 }
 
@@ -54,6 +58,32 @@ func errorResponse(w http.ResponseWriter, message string, code int){
 	encoder.Encode(Error{
 		Type: "error",
 		Message: message})
+}
+
+func messageWrite(ctx context.Context, userId string, email *Email) error {
+	vault := NewVault(ctx, userId)
+
+	writer, err := vault.EncryptTo(fmt.Sprintf("messages/%s/%s.gpg", userId, email.Id))
+
+	// Do nothing on key missing
+	if err == KeyMissing {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	_, err = io.WriteString(writer, email.Body)
+
+	if err != nil {
+		writer.Close()
+		return err
+	}
+
+	err = writer.Close()
+
+	return err
 }
 
 func emailHandle(w http.ResponseWriter, r *http.Request){
@@ -104,6 +134,13 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
+	err = messageWrite(ctx, u.Id(), &email)
+
+	if err != nil {
+		errorResponse500(w, err)
+		return
+	}
+
 	w.Header().Set("Content-type", "application/json; charset=utf-8")
 	encoder := json.NewEncoder(w)
 
@@ -115,6 +152,45 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 		Admin: u.IsAdmin(),
 		New: count == 0,
 	})
+}
+
+func encTest(w http.ResponseWriter, r *http.Request){
+	w.Header().Set("Content-type", "text/plain; charset=utf-8")
+	ctx := appengine.NewContext(r)
+	u := user.Current(ctx)
+
+	if u == nil {
+		url, _ := user.LoginURL(ctx, r.URL.Path)
+
+		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+		return
+	}
+
+	vault := NewVault(ctx, u.ID)
+
+	writer,err := vault.EncryptTo("test.gpg")
+
+	if err != nil {
+		http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+	}
+
+	_, err = writer.Write([]byte("this is a secret message"))
+
+	if err != nil {
+		http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+	}
+
+	err = writer.Close()
+
+	if err != nil {
+		http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+	}
+
+	err = vault.ArmorPrint("test.gpg", w)
+
+	if err != nil {
+		http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+	}
 }
 
 func handle(w http.ResponseWriter, r *http.Request) {
