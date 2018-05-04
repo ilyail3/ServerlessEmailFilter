@@ -38,6 +38,7 @@ type ActionResponse struct{
 	EMail string `json:"email"`
 	ID string `json:"id"`
 	Admin bool `json:"admin"`
+	New bool `json:"new"`
 }
 
 func errorResponse500(w http.ResponseWriter, e error){
@@ -88,6 +89,14 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 
 	email.UserId = u.Id()
 
+	emailKey := datastore.NewKey(ctx, "email", email.Id,0,nil)
+	count, err := datastore.NewQuery("email").Filter("__key__ =", emailKey).Count(ctx)
+
+	if err != nil {
+		errorResponse500(w, err)
+		return
+	}
+
 	_, err = datastore.Put(ctx, datastore.NewKey(ctx, "email", email.Id,0, nil), &email)
 
 	if err != nil {
@@ -104,6 +113,7 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 		EMail: u.Email(),
 		ID: u.Id(),
 		Admin: u.IsAdmin(),
+		New: count == 0,
 	})
 }
 
