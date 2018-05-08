@@ -144,14 +144,17 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-type", "application/json; charset=utf-8")
 	encoder := json.NewEncoder(w)
 
-	encoder.Encode(ActionResponse{
-		Type: "action",
-		Action: "do_nothing",
-		EMail: u.Email(),
-		ID: u.Id(),
-		Admin: u.IsAdmin(),
+	emailMatcher := HandleEmail(
+		AwsPendingConsolidationsHandler,
+		AwsSubscriptionNotificationHandler,
+		AzureDailyReportHandler,
+		CAWelcomeHandler)
+
+	encoder.Encode(emailMatcher(&EmailRequest{
+		Email:email,
+		User:u,
 		New: count == 0,
-	})
+	}))
 }
 
 func encTest(w http.ResponseWriter, r *http.Request){
