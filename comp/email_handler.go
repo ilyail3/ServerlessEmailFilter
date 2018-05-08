@@ -1,7 +1,9 @@
-package main
+package comp
 
 import (
 	"strings"
+	"context"
+	"fmt"
 )
 
 type EmailRequest struct{
@@ -73,4 +75,27 @@ func CAWelcomeHandler(request *EmailRequest, response *ActionResponse) bool {
 	}
 
 	return false
+}
+
+func CMSHandlerFactory(ctx context.Context)(error, func(*EmailRequest,*ActionResponse)bool){
+
+
+
+	return nil, func(r *EmailRequest, response *ActionResponse)bool{
+		if (
+			r.Email.From.Address == "no-reply@cloud.datapipe.com" ||
+				r.Email.From.Address == "no-reply@cms.dpcloud.com") &&
+			strings.HasPrefix(r.Email.Subject, "[CMS]") &&
+			strings.Contains(r.Email.Subject, " | "){
+
+			withoutPrefix := r.Email.Subject[6:len(r.Email.Subject)]
+			parts := strings.Split(withoutPrefix, " | ")
+
+			fmt.Printf("parts:%#v\n", parts)
+
+			return true
+		}
+
+		return false
+	}
 }

@@ -16,6 +16,8 @@ import (
 	"google.golang.org/appengine/user"
 	"context"
 	"io"
+
+	"github.com/ilyail3/ServerlessEmailFilter/comp"
 )
 
 type SiteHits struct{
@@ -24,9 +26,10 @@ type SiteHits struct{
 }
 
 func main() {
+
 	http.HandleFunc("/", handle)
 	http.HandleFunc("/email", emailHandle)
-	http.HandleFunc("/login", LoginHandle)
+	http.HandleFunc("/login", comp.LoginHandle)
 	http.HandleFunc("/enc", encTest)
 	appengine.Main()
 }
@@ -36,14 +39,6 @@ type Error struct{
 	Type string `json:"type"`
 }
 
-type ActionResponse struct{
-	Type string `json:"type"`
-	Action string `json:"action"`
-	EMail string `json:"email"`
-	ID string `json:"id"`
-	Admin bool `json:"admin"`
-	New bool `json:"new"`
-}
 
 func errorResponse500(w http.ResponseWriter, e error){
 	errorResponse(w, fmt.Sprintf("%v", e), http.StatusInternalServerError)
@@ -60,13 +55,13 @@ func errorResponse(w http.ResponseWriter, message string, code int){
 		Message: message})
 }
 
-func messageWrite(ctx context.Context, userId string, email *Email) error {
-	vault := NewVault(ctx, userId)
+func messageWrite(ctx context.Context, userId string, email *comp.Email) error {
+	vault := comp.NewVault(ctx, userId)
 
 	writer, err := vault.EncryptTo(fmt.Sprintf("messages/%s/%s.gpg", userId, email.Id))
 
 	// Do nothing on key missing
-	if err == KeyMissing {
+	if err == comp.KeyMissing {
 		return nil
 	}
 
@@ -94,7 +89,7 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 
 	ctx := appengine.NewContext(r)
 
-	u,err := TokenAuth(ctx, r)
+	u,err := comp.TokenAuth(ctx, r)
 
 	if u == nil {
 		errorResponse(w, "login missing", http.StatusUnauthorized)
@@ -108,7 +103,7 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 
 
 	decoder := json.NewDecoder(r.Body)
-	email := Email{}
+	email := comp.Email{}
 
 	err = decoder.Decode(&email)
 
@@ -144,13 +139,13 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-type", "application/json; charset=utf-8")
 	encoder := json.NewEncoder(w)
 
-	emailMatcher := HandleEmail(
-		AwsPendingConsolidationsHandler,
-		AwsSubscriptionNotificationHandler,
-		AzureDailyReportHandler,
-		CAWelcomeHandler)
+	emailMatcher := comp.HandleEmail(
+		comp.AwsPendingConsolidationsHandler,
+		comp.AwsSubscriptionNotificationHandler,
+		comp.AzureDailyReportHandler,
+		comp.CAWelcomeHandler)
 
-	encoder.Encode(emailMatcher(&EmailRequest{
+	encoder.Encode(emailMatcher(&comp.EmailRequest{
 		Email:email,
 		User:u,
 		New: count == 0,
@@ -169,7 +164,7 @@ func encTest(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
-	vault := NewVault(ctx, u.ID)
+	vault := comp.NewVault(ctx, u.ID)
 
 	writer,err := vault.EncryptTo("test.gpg")
 
