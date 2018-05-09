@@ -25,7 +25,7 @@ func (tu *TestUser) IsAdmin()bool {
 }
 
 func TestEmailHandler(t *testing.T){
-	err,f := comp.CMSHandlerFactory(context.Background())
+	f,err := comp.CMSHandlerFactory(context.Background())
 
 	if err != nil {
 		t.Error(err)
@@ -33,11 +33,14 @@ func TestEmailHandler(t *testing.T){
 
 	resp := comp.ActionResponse{}
 
-	match := f(&comp.EmailRequest{
+	match,err := f(&comp.EmailRequest{
 		Email: comp.Email{
 			Id: "test",
-			Subject: "[CMS] Production | Datapipe One CI Discrepancy Report",
-			Body: "",
+			Subject: "[CMS] Production | Environments Not Updating",
+			Body: `[AWS] RE/MAX, LLC - REMAX CRM, (id: 3355) (update queued)
+[AWS] RE/MAX, LLC - Motto Mortgage, (id: 3356) (update queued)
+[AWS] RE/MAX, LLC - MAXCNTR, (id: 3357) (update queued)
+[AWS] RE/MAX, LLC - Information Management, (id: 3359) (update queued)`,
 			From: comp.EmailAddress{
 				Address: "no-reply@cloud.datapipe.com",
 				Name: "Datapipe Cloud Services",
@@ -49,6 +52,10 @@ func TestEmailHandler(t *testing.T){
 		},
 		New: true,
 	}, &resp)
+
+	if err != nil {
+		t.Error("Error writing object", err)
+	}
 
 	if match != true {
 		t.Error("Not matched")

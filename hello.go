@@ -145,11 +145,17 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 		comp.AzureDailyReportHandler,
 		comp.CAWelcomeHandler)
 
-	encoder.Encode(emailMatcher(&comp.EmailRequest{
+	result, err := emailMatcher(&comp.EmailRequest{
 		Email:email,
 		User:u,
 		New: count == 0,
-	}))
+	})
+
+	if err != nil {
+		errorResponse500(w, err)
+	}
+
+	encoder.Encode(result)
 }
 
 func encTest(w http.ResponseWriter, r *http.Request){
