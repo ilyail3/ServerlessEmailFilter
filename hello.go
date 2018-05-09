@@ -20,7 +20,7 @@ import (
 	"github.com/ilyail3/ServerlessEmailFilter/comp"
 )
 
-type SiteHits struct{
+type SiteHits struct {
 	Path string
 	Date time.Time
 }
@@ -34,24 +34,23 @@ func main() {
 	appengine.Main()
 }
 
-type Error struct{
+type Error struct {
 	Message string `json:"message"`
-	Type string `json:"type"`
+	Type    string `json:"type"`
 }
 
-
-func errorResponse500(w http.ResponseWriter, e error){
+func errorResponse500(w http.ResponseWriter, e error) {
 	errorResponse(w, fmt.Sprintf("%v", e), http.StatusInternalServerError)
 }
 
-func errorResponse(w http.ResponseWriter, message string, code int){
+func errorResponse(w http.ResponseWriter, message string, code int) {
 	w.Header().Set("Content-type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 
 	encoder := json.NewEncoder(w)
 
 	encoder.Encode(Error{
-		Type: "error",
+		Type:    "error",
 		Message: message})
 }
 
@@ -81,7 +80,7 @@ func messageWrite(ctx context.Context, userId string, email *comp.Email) error {
 	return err
 }
 
-func emailHandle(w http.ResponseWriter, r *http.Request){
+func emailHandle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		errorResponse(w, "Only 'POST' requests are allowed", http.StatusMethodNotAllowed)
 		return
@@ -89,7 +88,7 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 
 	ctx := appengine.NewContext(r)
 
-	u,err := comp.TokenAuth(ctx, r)
+	u, err := comp.TokenAuth(ctx, r)
 
 	if u == nil {
 		errorResponse(w, "login missing", http.StatusUnauthorized)
@@ -100,7 +99,6 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 		errorResponse500(w, err)
 		return
 	}
-
 
 	decoder := json.NewDecoder(r.Body)
 	email := comp.Email{}
@@ -114,7 +112,7 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 
 	email.UserId = u.Id()
 
-	emailKey := datastore.NewKey(ctx, "email", email.Id,0,nil)
+	emailKey := datastore.NewKey(ctx, "email", email.Id, 0, nil)
 	count, err := datastore.NewQuery("email").Filter("__key__ =", emailKey).Count(ctx)
 
 	if err != nil {
@@ -122,7 +120,7 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
-	_, err = datastore.Put(ctx, datastore.NewKey(ctx, "email", email.Id,0, nil), &email)
+	_, err = datastore.Put(ctx, datastore.NewKey(ctx, "email", email.Id, 0, nil), &email)
 
 	if err != nil {
 		errorResponse500(w, err)
@@ -139,26 +137,35 @@ func emailHandle(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-type", "application/json; charset=utf-8")
 	encoder := json.NewEncoder(w)
 
+	cmsHandler, err := comp.CMSHandlerFactory(ctx)
+
+	if err != nil {
+		errorResponse500(w, err)
+		return
+	}
+
 	emailMatcher := comp.HandleEmail(
 		comp.AwsPendingConsolidationsHandler,
 		comp.AwsSubscriptionNotificationHandler,
 		comp.AzureDailyReportHandler,
-		comp.CAWelcomeHandler)
+		comp.CAWelcomeHandler,
+		cmsHandler)
 
 	result, err := emailMatcher(&comp.EmailRequest{
-		Email:email,
-		User:u,
-		New: count == 0,
+		Email: email,
+		User:  u,
+		New:   count == 0,
 	})
 
 	if err != nil {
 		errorResponse500(w, err)
+		return
 	}
 
 	encoder.Encode(result)
 }
 
-func encTest(w http.ResponseWriter, r *http.Request){
+func encTest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "text/plain; charset=utf-8")
 	ctx := appengine.NewContext(r)
 	u := user.Current(ctx)
@@ -172,7 +179,7 @@ func encTest(w http.ResponseWriter, r *http.Request){
 
 	vault := comp.NewVault(ctx, u.ID)
 
-	writer,err := vault.EncryptTo("test.gpg")
+	writer, err := vault.EncryptTo("test.gpg")
 
 	if err != nil {
 		http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
@@ -199,7 +206,7 @@ func encTest(w http.ResponseWriter, r *http.Request){
 
 func handle(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
-	log.Infof(ctx,"test url:%v" , r.URL)
+	log.Infof(ctx, "test url:%v", r.URL)
 
 	hit := SiteHits{
 		Path: r.URL.Path,

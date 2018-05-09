@@ -12,20 +12,20 @@ import (
 )
 
 type PgpVault struct {
-	ctx context.Context
+	ctx    context.Context
 	userId string
 }
 
 type encryptionWriter struct {
 	openPgpWriter io.WriteCloser
-	objectWriter *storage.Writer
+	objectWriter  *storage.Writer
 }
 
-func(e *encryptionWriter)Write(p []byte)(int,error){
+func (e *encryptionWriter) Write(p []byte) (int, error) {
 	return e.openPgpWriter.Write(p)
 }
 
-func(e *encryptionWriter)Close() error{
+func (e *encryptionWriter) Close() error {
 	err := e.openPgpWriter.Close()
 
 	if err != nil {
@@ -42,18 +42,17 @@ func(e *encryptionWriter)Close() error{
 	return nil
 }
 
-
 var KeyMissing = errors.New("vault: user provided no public key")
 
-func (v *PgpVault) EncryptTo(key string)(io.WriteCloser, error){
+func (v *PgpVault) EncryptTo(key string) (io.WriteCloser, error) {
 	// Get key
-	bucketName,err := file.DefaultBucketName(v.ctx)
+	bucketName, err := file.DefaultBucketName(v.ctx)
 
 	if err != nil {
 		return nil, err
 	}
 
-	client,err := storage.NewClient(v.ctx)
+	client, err := storage.NewClient(v.ctx)
 
 	if err != nil {
 		return nil, err
@@ -103,19 +102,19 @@ func (v *PgpVault) EncryptTo(key string)(io.WriteCloser, error){
 
 	return &encryptionWriter{
 		openPgpWriter: writer,
-		objectWriter: w,
+		objectWriter:  w,
 	}, nil
 }
 
-func (v *PgpVault) ArmorPrint(key string, w io.Writer)error{
+func (v *PgpVault) ArmorPrint(key string, w io.Writer) error {
 	// Get key
-	bucketName,err := file.DefaultBucketName(v.ctx)
+	bucketName, err := file.DefaultBucketName(v.ctx)
 
 	if err != nil {
 		return err
 	}
 
-	client,err := storage.NewClient(v.ctx)
+	client, err := storage.NewClient(v.ctx)
 
 	if err != nil {
 		return err
@@ -133,7 +132,7 @@ func (v *PgpVault) ArmorPrint(key string, w io.Writer)error{
 
 	defer reader.Close()
 
-	armorWriter,err := armor.Encode(w, "PGP MESSAGE", map[string]string{ "Version":"GnuPG v2" })
+	armorWriter, err := armor.Encode(w, "PGP MESSAGE", map[string]string{"Version": "GnuPG v2"})
 
 	if err != nil {
 		return err
@@ -150,9 +149,9 @@ func (v *PgpVault) ArmorPrint(key string, w io.Writer)error{
 	return nil
 }
 
-func NewVault(ctx context.Context, userId string)*PgpVault{
+func NewVault(ctx context.Context, userId string) *PgpVault {
 	return &PgpVault{
-		ctx:ctx,
-		userId:userId,
+		ctx:    ctx,
+		userId: userId,
 	}
 }

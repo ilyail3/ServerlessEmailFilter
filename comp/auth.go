@@ -21,19 +21,19 @@ type AuthUser interface {
 
 type jwtUser struct {
 	email string
-	id string
+	id    string
 	admin bool
 }
 
-func(u *jwtUser)Email() string{
+func (u *jwtUser) Email() string {
 	return u.email
 }
 
-func(u *jwtUser)Id() string{
+func (u *jwtUser) Id() string {
 	return u.id
 }
 
-func(u *jwtUser)IsAdmin() bool{
+func (u *jwtUser) IsAdmin() bool {
 	return u.admin
 }
 
@@ -41,7 +41,7 @@ type secretStruct struct {
 	Data string
 }
 
-func secret(ctx context.Context)([]byte, error) {
+func secret(ctx context.Context) ([]byte, error) {
 	key := datastore.NewKey(ctx, "secret", "secret", 0, nil)
 	data := secretStruct{}
 
@@ -60,9 +60,9 @@ func secret(ctx context.Context)([]byte, error) {
 	return bytes, err
 }
 
-func TokenAuth(ctx context.Context, r *http.Request)(AuthUser, error){
+func TokenAuth(ctx context.Context, r *http.Request) (AuthUser, error) {
 	if r.Header.Get("X-JWT") == "" {
-		return nil,nil
+		return nil, nil
 	}
 
 	token, err := jwt.Parse(r.Header.Get("X-JWT"), func(token *jwt.Token) (interface{}, error) {
@@ -88,7 +88,7 @@ func TokenAuth(ctx context.Context, r *http.Request)(AuthUser, error){
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		return &jwtUser{
 			email: claims["email"].(string),
-			id: claims["id"].(string),
+			id:    claims["id"].(string),
 			admin: claims["admin"].(bool),
 		}, nil
 	} else {
@@ -96,7 +96,7 @@ func TokenAuth(ctx context.Context, r *http.Request)(AuthUser, error){
 	}
 }
 
-func LoginHandle(w http.ResponseWriter, r *http.Request){
+func LoginHandle(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 	u := user.Current(ctx)
 	if u == nil {
@@ -113,7 +113,7 @@ func LoginHandle(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
-	jwtSecret,err := secret(ctx)
+	jwtSecret, err := secret(ctx)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -121,7 +121,7 @@ func LoginHandle(w http.ResponseWriter, r *http.Request){
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id": u.ID,
+		"id":    u.ID,
 		"email": u.Email,
 		"admin": u.Admin,
 	})
@@ -134,5 +134,5 @@ func LoginHandle(w http.ResponseWriter, r *http.Request){
 	}
 
 	w.Header().Set("Content-type", "text/plain; charset=utf-8")
-	fmt.Fprint(w,tokenString)
+	fmt.Fprint(w, tokenString)
 }

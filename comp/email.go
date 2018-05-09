@@ -9,24 +9,24 @@ import (
 
 type EmailAddress struct {
 	Address string `json:"address"`
-	Name string `json:"name"`
+	Name    string `json:"name"`
 }
 
-type Email struct{
-	Id string `json:"id"`
-	Subject string `json:"subject"`
-	Body string `json:"body"`
-	From EmailAddress `json:"from"`
-	ToAddress []EmailAddress `json:"toAddress"`
-	CcAddress []EmailAddress `json:"ccAddress"`
-	BccAddress []EmailAddress `json:"bccAddress"`
-	SendTime time.Time `json:"sendTime"`
-	ReceiveTime time.Time `json:"receiveTime"`
-	CreateTime time.Time `json:"createTime"`
-	UserId string
+type Email struct {
+	Id          string         `json:"id"`
+	Subject     string         `json:"subject"`
+	Body        string         `json:"body"`
+	From        EmailAddress   `json:"from"`
+	ToAddress   []EmailAddress `json:"toAddress"`
+	CcAddress   []EmailAddress `json:"ccAddress"`
+	BccAddress  []EmailAddress `json:"bccAddress"`
+	SendTime    time.Time      `json:"sendTime"`
+	ReceiveTime time.Time      `json:"receiveTime"`
+	CreateTime  time.Time      `json:"createTime"`
+	UserId      string
 }
 
-func addressToJson(emails []EmailAddress, name string)([]datastore.Property,error){
+func addressToJson(emails []EmailAddress, name string) ([]datastore.Property, error) {
 	items := make([]datastore.Property, len(emails))
 
 	for i, add := range emails {
@@ -44,7 +44,7 @@ func addressToJson(emails []EmailAddress, name string)([]datastore.Property,erro
 	return items, nil
 }
 
-func jsonToAddress(address string)(EmailAddress, error){
+func jsonToAddress(address string) (EmailAddress, error) {
 	result := EmailAddress{}
 
 	err := json.Unmarshal([]byte(address), &result)
@@ -56,7 +56,7 @@ func jsonToAddress(address string)(EmailAddress, error){
 	return result, nil
 }
 
-func (e *Email)Save()([]datastore.Property, error){
+func (e *Email) Save() ([]datastore.Property, error) {
 	bytes, err := json.Marshal(e.From)
 
 	if err != nil {
@@ -64,14 +64,14 @@ func (e *Email)Save()([]datastore.Property, error){
 	}
 
 	result := []datastore.Property{
-		{Name:"subject", Value:e.Subject},
+		{Name: "subject", Value: e.Subject},
 		// body can easily exceed the maximum allowed for entry store(currently 1500 chars)
 		// {Name:"body", Value:e.Body},
-		{Name:"from", Value:string(bytes)},
-		{Name:"send_time", Value:e.SendTime},
-		{Name:"receive_time", Value:e.ReceiveTime},
-		{Name:"create_time", Value:e.CreateTime},
-		{Name:"user_id", Value:e.UserId},
+		{Name: "from", Value: string(bytes)},
+		{Name: "send_time", Value: e.SendTime},
+		{Name: "receive_time", Value: e.ReceiveTime},
+		{Name: "create_time", Value: e.CreateTime},
+		{Name: "user_id", Value: e.UserId},
 	}
 
 	toAddress, err := addressToJson(e.ToAddress, "to_address")
@@ -101,7 +101,7 @@ func (e *Email)Save()([]datastore.Property, error){
 	return result, nil
 }
 
-func (e *Email) Load(props []datastore.Property) error{
+func (e *Email) Load(props []datastore.Property) error {
 	var err error = nil
 	var address EmailAddress
 
@@ -109,13 +109,13 @@ func (e *Email) Load(props []datastore.Property) error{
 	e.CcAddress = make([]EmailAddress, 0)
 	e.BccAddress = make([]EmailAddress, 0)
 
-	for _, p := range props{
+	for _, p := range props {
 		if p.Name == "subject" {
 			e.Subject = p.Value.(string)
 		} else if p.Name == "body" {
 			e.Body = p.Value.(string)
 		} else if p.Name == "to_address" {
-			e.From,err = jsonToAddress(p.Value.(string))
+			e.From, err = jsonToAddress(p.Value.(string))
 		} else if p.Name == "send_time" {
 			e.SendTime = p.Value.(time.Time)
 		} else if p.Name == "receive_time" {

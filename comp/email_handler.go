@@ -10,14 +10,14 @@ import (
 	"strconv"
 )
 
-type EmailRequest struct{
+type EmailRequest struct {
 	Email Email
-	User AuthUser
-	New bool
+	User  AuthUser
+	New   bool
 }
 
-func HandleEmail(handlers ...func(*EmailRequest, *ActionResponse)(bool,error)) func(*EmailRequest)(ActionResponse,error){
-	return func(request *EmailRequest)(ActionResponse,error) {
+func HandleEmail(handlers ...func(*EmailRequest, *ActionResponse) (bool, error)) func(*EmailRequest) (ActionResponse, error) {
+	return func(request *EmailRequest) (ActionResponse, error) {
 		response := ActionResponse{
 			Type:   "action",
 			Action: "do_nothing",
@@ -28,7 +28,7 @@ func HandleEmail(handlers ...func(*EmailRequest, *ActionResponse)(bool,error)) f
 		}
 
 		for _, handler := range handlers {
-			matched,err := handler(request, &response)
+			matched, err := handler(request, &response)
 
 			if err != nil {
 				return response, err
@@ -39,74 +39,74 @@ func HandleEmail(handlers ...func(*EmailRequest, *ActionResponse)(bool,error)) f
 			}
 		}
 
-		return response,nil
+		return response, nil
 	}
 }
 
-func AwsPendingConsolidationsHandler(request *EmailRequest, response *ActionResponse)(bool,error) {
+func AwsPendingConsolidationsHandler(request *EmailRequest, response *ActionResponse) (bool, error) {
 	if request.Email.From.Address == "no-reply@cloud.datapipe.com" &&
 		strings.HasPrefix(request.Email.Subject, "[AWS] Production | Pending Consolidations:") {
 
 		response.Action = "delete"
-		return true,nil
+		return true, nil
 	}
 
-	return false,nil
+	return false, nil
 }
 
-func AwsSubscriptionNotificationHandler(request *EmailRequest, response *ActionResponse)(bool,error) {
+func AwsSubscriptionNotificationHandler(request *EmailRequest, response *ActionResponse) (bool, error) {
 	if request.Email.From.Address == "no-reply-aws@amazon.com" &&
 		request.Email.Subject == "Important Notification Regarding Your AWS Marketplace Subscription" {
 
 		response.Action = "delete"
-		return true,nil
+		return true, nil
 	}
 
-	return false,nil
+	return false, nil
 }
 
-func AzureDailyReportHandler(request *EmailRequest, response *ActionResponse)(bool,error) {
+func AzureDailyReportHandler(request *EmailRequest, response *ActionResponse) (bool, error) {
 	if request.Email.From.Address == "no-reply@cms.dpcloud.com" &&
 		strings.HasPrefix(request.Email.Subject, "CMS | Azure Daily Usage Audit Report:") {
 
 		response.Action = "delete"
-		return true,nil
+		return true, nil
 	}
 
-	return false,nil
+	return false, nil
 }
 
-func CAWelcomeHandler(request *EmailRequest, response *ActionResponse)(bool,error) {
+func CAWelcomeHandler(request *EmailRequest, response *ActionResponse) (bool, error) {
 	if request.Email.From.Address == "no-reply@cloud.datapipe.com" &&
 		request.Email.Subject == "Welcome to Datapipe Cloud Analytics" {
 
 		response.Action = "delete"
-		return true,nil
+		return true, nil
 	}
 
-	return false,nil
+	return false, nil
 }
 
 type EnvironmentNotUpdated struct {
-	Time time.Time
-	PaId uint
+	Time   time.Time
+	PaId   int
 	UserId string
 }
 
-func CMSHandlerFactory(ctx context.Context)(func(*EmailRequest,*ActionResponse)(bool,error), error){
+func CMSHandlerFactory(ctx context.Context) (func(*EmailRequest, *ActionResponse) (bool, error), error) {
 
-	paIdRegex,err := regexp.Compile("\\(id: ([0-9]+)\\)")
+	paIdRegex, err := regexp.Compile("\\(id: ([0-9]+)\\)")
 
 	if err != nil {
 		return nil, err
 	}
 
-	return func(r *EmailRequest, response *ActionResponse)(bool, error){
+	return func(r *EmailRequest, response *ActionResponse) (bool, error) {
 		if (
 			r.Email.From.Address == "no-reply@cloud.datapipe.com" ||
 				r.Email.From.Address == "no-reply@cms.dpcloud.com") &&
 			strings.HasPrefix(r.Email.Subject, "[CMS]") &&
-			strings.Contains(r.Email.Subject, " | "){
+			strings.Contains(r.Email.Subject, " | ") {
 
 			withoutPrefix := r.Email.Subject[6:len(r.Email.Subject)]
 			parts := strings.Split(withoutPrefix, " | ")
@@ -116,10 +116,10 @@ func CMSHandlerFactory(ctx context.Context)(func(*EmailRequest,*ActionResponse)(
 				ids := paIdRegex.FindAllStringSubmatch(r.Email.Body, -1)
 
 				for _, pair := range ids {
-					key := datastore.NewKey(ctx, "environment-not-updated", fmt.Sprintf(
+					key := datastore.NewKey(ctx, "enu", fmt.Sprintf(
 						"%s-%s",
 						r.User.Id(),
-						pair[1]),0,nil)
+						pair[1]), 0, nil)
 
 					paId, err := strconv.Atoi(pair[1])
 
@@ -128,12 +128,12 @@ func CMSHandlerFactory(ctx context.Context)(func(*EmailRequest,*ActionResponse)(
 					}
 
 					env := EnvironmentNotUpdated{
-						Time: r.Email.ReceiveTime,
-						PaId: uint(paId),
+						Time:   r.Email.ReceiveTime,
+						PaId:   paId,
 						UserId: r.User.Id(),
 					}
 
-					_, err = datastore.Put(ctx, key, env)
+					_, err = datastore.Put(ctx, key, &env)
 
 					if err != nil {
 						return false, err
